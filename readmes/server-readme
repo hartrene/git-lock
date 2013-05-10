@@ -1,0 +1,22 @@
+This archive contains all files to setup a lock-server.
+
+The lock-server has the following prerequisites:
+	- openssl
+	- sshd 
+	- an ssh user which can be used by all git-lock clients
+	
+bin: (LOCK_SERVER_BIN_DIR)
+	Contains all files binary files for the lock-server.
+	This directory needs to be published by the environment variable LOCK_SERVER_BIN_DIR.
+	All ssh user who are going use the lock-server need to set-up this variable.
+	
+		The export needs the / at the end!
+		> export LOCK_SERVER_BIN_DIR=lock-server/bin/
+	
+lock-working-dir: (LOCK_SERVER_DIR)
+	This is an empty directoy which needs to be set-up on the lock-server.
+	This lock-server script will use this directory as the working dir.
+	This directory needs to be empty in the beginning!
+	
+	This directory needs to be published by the environment variable LOCK_SERVER_DIR.
+	All ssh user who are going use the lock-server need to set-up this variable.

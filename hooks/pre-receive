@@ -1,0 +1,81 @@
+#!/bin/bash
+
+# Copyright 2013 Rene Hartmann
+# 
+# This file is part of git-lock.
+# 
+# git-lock is free software: you can redistribute it and/or modify
+# it under the terms of the GNU General Public License as published by
+# the Free Software Foundation, either version 3 of the License, or
+# (at your option) any later version.
+# 
+# git-lock is distributed in the hope that it will be useful,
+# but WITHOUT ANY WARRANTY; without even the implied warranty of
+# MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
+# GNU General Public License for more details.
+# 
+# You should have received a copy of the GNU General Public License
+# along with git-lock.  If not, see <http://www.gnu.org/licenses/>.
+# 
+# Additional permission under GNU GPL version 3 section 7:
+# 
+# If you modify the Program, or any covered work, by linking or
+# combining it with the OpenSSL project's OpenSSL library (or a
+# modified version of that library), containing parts covered by the
+# terms of the OpenSSL or SSLeay licenses, the licensors of the Program
+# grant you additional permission to convey the resulting work.
+# Corresponding Source for a non-source form of such a combination
+# shall include the source code for the parts of OpenSSL used as well
+# as that of the covered work.
+
+# Git pre-receive hook to check if all received changed lockable files are authorized by the lock-server.
+#
+# It will validate:
+#
+# 1. If a lockable file was added, then check the change confirmation signature
+# 2. If a lockable file was changed, then check the change confirmation signature
+# 3. If a lockable file was deleted, then check the remove confirmation signature
+#
+# The limitation of the pre-receive hook is, that a new file gets committed
+# without committing the (.lock or .lock-change-confirm or .lock-remove-confirm)
+# this hook is not able to verify the file change, simply because it has not information
+# that this new file was ever used with git-lock.
+
+# Discover the git-lock hook root directory, to be able to include the util functions
+if [ -n "$LOCK_CLIENT_BIN_DIR" ]; then
+	hookBaseDirectory="$LOCK_CLIENT_BIN_DIR"
+else
+	hookBaseScriptPath=$(which hook-base.sh)
+	if [ ! $? -eq 0 ]; then
+		echo "Error: hook-base.sh script is not in the path"
+		exit 1
+	fi
+	hookBaseDirectory=$(echo "$hookBaseScriptPath" | sed 's%/[^/]*$%/%')
+fi
+
+# Import hook utils functions
+. "${hookBaseDirectory}/hook-base.sh" "$@"
+
+# Import util functions
+. "${hookBaseDirectory}/lock-util.sh"
+
+logLevel=$LOG_LEVEL_DEBUG
+
+logDebug "@@@@@ Run git-lock pre-receive hook"
+
+# As pre-receive could run within a bare repository we wouldn't find git-root, so leave it blank
+gitRoot=""
+
+# Read all commit changes
+while read oldrev newrev refname; do
+	# Check against what we have to compare to get the commit changes
+	if [ "$oldrev" = "0000000000000000000000000000000000000000" ]; then
+		# Initial commit: diff against an empty tree object
+		against=4b825dc642cb6eb9a060e54bf8d69288fbee4904
+	else
+		against="$oldrev"
+	fi
+	
+	discoverCommitChanges "git diff-tree -r "$against" "$newrev""
+	checkFileChanges
+done
