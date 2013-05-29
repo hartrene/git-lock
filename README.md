@@ -25,18 +25,17 @@ Git-lock consists of two components.
 
 ## Sample
 
-> \# Clone an existing git repo (step omitted)
-
-> \# Init git-lock and point it to the lock-server
+Clone an existing git repo (step omitted)
+Init git-lock and point it to the lock-server
 > $ git-lock init -server 192.168.0.80 -ssh-port 22 -remote-user dirk -project dv13 -release 0.1
 
-> \# Lock a binary file, so that no one else can edit this file until the change was committed to the shared repo
+Lock a binary file, so that no one else can edit this file until the change was committed to the shared repo
 > $ git-lock lock image.png # No one will be allowed to lock this files at the 
 
-> \# Unlock the file
+Unlock the file
 > $ git-lock unlock image.png
 
-> \# Commit the changed binary file and the lock-server change-signature to the shared git repo (steps omitted)
+Commit the changed binary file and the lock-server change-signature to the shared git repo (steps omitted)
 
 ## CURRENT STATUS
 
