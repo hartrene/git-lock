@@ -45,5 +45,5 @@ to try it and to make it better.
 
 ## LIMITATIONS
 
-* Not able to see which files which are locked by the user or to see which files are locked by all other users
+* Not able to see which files are locked by the user or to see which files are locked by all other users
 * No command to break locks e.g. for the admin
