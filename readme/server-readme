@@ -1,0 +1,30 @@
+This archive contains all files to set-up a lock-server.
+
+The lock-server has the following prerequisites:
+	- sshd 
+	- access for all clients to that server via ssh, e.g. a ssh user which can be used by all git-lock clients
+	
+bin: (LOCK_SERVER_BIN_DIR)
+	Contains all binary files for the lock-server.
+	This directory needs to be published by the environment variable LOCK_SERVER_BIN_DIR.
+	All ssh users who are going to use the lock-server need to set-up this variable.
+	
+		> export LOCK_SERVER_BIN_DIR=/lock-server/bin
+	
+	When you put this line e.g. into the .bashrc of that user be careful to put it above that line which stops execution if shell is not executed interactively.
+	Bare in mind that ssh starts a non-interactive shell.
+	
+		> #If not running interactively, don't do anything
+		> [ -z "$PS1" ] && return
+	
+lock-working-dir: (LOCK_SERVER_DIR)
+	This is an empty directory which needs to be set-up on the lock-server.
+	The lock-server script will use this directory as the working directory.
+	This directory is expected to be empty in the beginning.
+	
+	This directory needs to be published by the environment variable LOCK_SERVER_DIR.
+	All ssh user who are going use the lock-server need to set-up this variable.
+	
+		> export LOCK_SERVER_DIR=/lock-server/working-dir
+		
+	When you put this line e.g. into the .bashrc of that user be careful to put it above that line which stops execution if shell is not executed interactively (see setup of LOCK_SERVER_BIN_DIR for more details).

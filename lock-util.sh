@@ -1,34 +1,42 @@
 #!/bin/bash
 
-# Copyright 2013 Rene Hartmann
-# 
-# This file is part of git-lock.
-# 
-# git-lock is free software: you can redistribute it and/or modify
-# it under the terms of the GNU General Public License as published by
-# the Free Software Foundation, either version 3 of the License, or
-# (at your option) any later version.
-# 
-# git-lock is distributed in the hope that it will be useful,
-# but WITHOUT ANY WARRANTY; without even the implied warranty of
-# MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
-# GNU General Public License for more details.
-# 
-# You should have received a copy of the GNU General Public License
-# along with git-lock.  If not, see <http://www.gnu.org/licenses/>.
-# 
-# Additional permission under GNU GPL version 3 section 7:
-# 
-# If you modify the Program, or any covered work, by linking or
-# combining it with the OpenSSL project's OpenSSL library (or a
-# modified version of that library), containing parts covered by the
-# terms of the OpenSSL or SSLeay licenses, the licensors of the Program
-# grant you additional permission to convey the resulting work.
-# Corresponding Source for a non-source form of such a combination
-# shall include the source code for the parts of OpenSSL used as well
-# as that of the covered work.
-
 # Contains util functions for the lock-server and git-lock client.
+
+# Property file name which holds informatin of the current project/release and server details.
+PROPERTY_FILE="git-lock.properties"
+
+# Create the git-lock properties file path and checks if it exists
+#
+# @param RESULT_VARIABLE variable in which the path will be stored
+# @return_codes 0=file exists 1=file does not exist
+# @return_value nothing
+needPropertyFilePath() {
+	checkParameter 1 "needPropertyFilePath() [RESULT_VARIABLE] [FILE]" "$@"
+	local resultVariable=$1; eval $resultVariable=
+	getPropertyFilePath propertyFilePath $PROPERTY_FILE
+		
+	if [ ! -e "$propertyFilePath" ]; then
+		local errorMsg="Git-lock property file '$propertyFilePath' not found. Run 'git-lock init' first."
+		logError "$errorMsg"
+		echo "$errorMsg"
+		exit 1
+	fi
+	
+	eval $resultVariable="'${propertyFilePath}'"
+}
+
+# Creates the filepath of the git-lock property file.
+#
+# @param RESULT_VARIABLE variable in which the path will be stored
+# @return_codes 0=success 1=failure
+# @return_value nothing
+getPropertyFilePath() {
+	checkAtLeastParameter 2 "getPropertyFilePath() [RESULT_VARIABLE] [FILE]" "$@"
+	local resultVariable=$1; local file=$2
+	eval $resultVariable=
+	discoverGitConfig gitConfig
+	eval $resultVariable="'${gitConfig}${file}'"
+}
 
 # Checks if exactly expected parameter are passed to a function
 # Print the given usage message and logs all given parameter, if the expected parameter doesn't match with the given parameter
@@ -133,45 +141,7 @@ expectSuccess() {
 	fi
 }
 
-# Verifies the given signature against the given content.
-# 
-# @param PUBLIC_KEY_FILE Key file which will be used to verify the signature
-# @param SIGNATURE_BASE64 Base64 encoded signature
-# @param SIGNED_CONTENT Content which should fit to the passed signature
-# @return_codes 0=success 1=failure
-# @return_value nothing
-verifySignature() {
-	checkParameter 3 "verifySignature() [PUBLIC_KEY_FILE] [SIGNATURE_BASE64] [SIGNED_CONTENT]" "$@"
-	local publicKeyFile="$1"; local signatureBase64="$2"; local signedContent="$3";
-	
-	logDebug "Validate signature: $signatureBase64 against $signedContent"
-	
-	local signatureTestDir="signaturetest"
-	local contentFileToValidate="${signatureTestDir}/content.file"
-	local signatureBase64File="${signatureTestDir}/signature.base64"
-	local signatureByteFile="${signatureTestDir}/signature.byte"
-	
-	createDir "$signatureTestDir" "" "Error while creating directory for signature test: $signatureTestDir"
-	
-	# Save the content to verify to a file
-	echo "$signedContent" > "$contentFileToValidate"
-	# Lock the file and store the receiving signature (will be base64 encoded)
-	echo "$signatureBase64" > "$signatureBase64File"
-	# Restore the original signature (byte) and store it in a file
-	base64 -d "$signatureBase64File" > "$signatureByteFile"
-	expectSuccess "Unable to convert the received base64 content to bytes: $signatureBase64" $?
-	
-	# Validate the received public key and the received signature against the content hash
-	returnValue=$(openssl dgst -sha1 -verify "$publicKeyFile" -signature "$signatureByteFile" "$contentFileToValidate" 1>/dev/null)
-	validationSuccessful=$?
-	logDebug "Validation result: $validationSuccessful"
-	
-	rm -rf "$signatureTestDir"
-	
-	return $validationSuccessful
-}
-
-# Build the hash code of the given file including the subdirectory starting from git root.
+# Builds the hash of the given file including the subdirectory starting from git root.
 #
 # @param FILE File for which the unique hash code should be created
 # @return_codes 0=success 1=failure
@@ -180,15 +150,9 @@ buildFilepathHash() {
 	checkParameter 1 "buildFilepathHash() [FILE]" "$@"
 	local file="$1";
 
-	# Build the file path of the given file including the subdirectory starting from git root
-	relativeFilepath=$(discoverRelativeFilepathFromGitRoot "$file")
-	expectSuccess "Error while discovering the relative filepath from git root occurred: $relativeFilepath" $?
-	
-	logDebug "Build unique filename hash for path: $relativeFilepath"
-	
 	# Get the hash of the filename
-	fileNameHash=$(echo "$relativeFilepath" | md5sum | cut -f1 -d' ')
-	expectSuccess "Error while creating the file name hash for relativeFilepath occurred: $fileNameHash" $?
+	fileNameHash=$(echo "$file" | md5sum | cut -f1 -d' ')
+	expectSuccess "Error while creating the file name hash for relativeFilepath occurred: $file" $?
 	
 	echo "$fileNameHash"
 }
@@ -206,10 +170,16 @@ discoverRelativeFilepathFromGitRoot() {
 	discoverGitRoot gitRoot
 		
 	# Build the relative filepath
-	local currentDirectory="$(pwd)/"
-	local gitSubDirectory="${currentDirectory/$gitRoot/}"
-	local relativeFilepath="${gitSubDirectory}/${file}"
-	
+	local currentDirectory="$(pwd)"
+	local gitSubDirectory="${currentDirectory/${gitRoot}\//}"
+	if [ "$gitSubDirectory" == "$currentDirectory" ]; then
+		local gitSubDirectory="${currentDirectory/${gitRoot}/}"
+	fi
+	if [ "$gitSubDirectory" = "" ]; then
+		local relativeFilepath="$file"
+	else
+		local relativeFilepath="$gitSubDirectory/$file"
+	fi
 	echo "$relativeFilepath"
 }
 
@@ -223,13 +193,40 @@ discoverGitRoot() {
 	local resultVariable=$1; eval $resultVariable=
 	
 	gitRoot=$(git rev-parse --show-toplevel)
-	expectSuccess "Git root can't be found. Run git-lock from within a git repo." $?
+	expectSuccess "Git root couldn't be found. Run git-lock within a git repo." $?
 	
 	if [ -n "$gitRoot" ]; then
-		eval $resultVariable="'${gitRoot}/'"
+		eval $resultVariable="'${gitRoot}'"
 	else
 		eval $resultVariable="''"
 	fi
+}
+
+# Looks for the .git directory.
+#
+# @param RESULT_VARIABLE Variable in which the directory should be stored
+# @return_codes 0=success 1=failure
+# @return_value nothing
+discoverGitConfig() {
+	checkParameter 1 "discoverGitConfig() [RESULT_VARIABLE]" "$@"
+	local resultVariable=$1; eval $resultVariable=
+	discoverGitRoot gitRoot
+	
+	if [ "$gitRoot" != "" ]; then
+		logDebug "Found git root: $gitRoot"
+		gitRoot="$gitRoot/"
+	fi
+	
+	if [ -e "${gitRoot}.git" ]; then
+		logDebug "Found normal git repository in: $gitRoot"
+		discoverGitRoot gitRoot
+		gitConfig="$gitRoot/.git/"
+	else
+		logDebug "Found git bare repository in: $(pwd)"
+		gitConfig="$(pwd)/"
+	fi
+	
+	eval $resultVariable="'${gitConfig}'"
 }
 
 # Acquires the named mutex
@@ -283,7 +280,7 @@ releaseMutex() {
 	fi
 }
 
-# Returns and checks if the passed dirctory exists
+# Returns and checks if the passed in directory exists
 #
 # @param DIRECTORY Directory which needs to be checked
 # @return_codes 0=Directory exists 1=Directory doesn't exist
@@ -413,6 +410,7 @@ logError() {
 
 ####################################################################
 # Bash v3 does not support associative arrays
+# This is a workaround and uses aliases to store data in a kind of map
 # Usage: map_put map_name key value
 #
 mapPut() {

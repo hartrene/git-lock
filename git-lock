@@ -1,33 +1,5 @@
 #!/bin/bash
 
-# Copyright 2013 Rene Hartmann
-# 
-# This file is part of git-lock.
-# 
-# git-lock is free software: you can redistribute it and/or modify
-# it under the terms of the GNU General Public License as published by
-# the Free Software Foundation, either version 3 of the License, or
-# (at your option) any later version.
-# 
-# git-lock is distributed in the hope that it will be useful,
-# but WITHOUT ANY WARRANTY; without even the implied warranty of
-# MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
-# GNU General Public License for more details.
-# 
-# You should have received a copy of the GNU General Public License
-# along with git-lock.  If not, see <http://www.gnu.org/licenses/>.
-# 
-# Additional permission under GNU GPL version 3 section 7:
-# 
-# If you modify the Program, or any covered work, by linking or
-# combining it with the OpenSSL project's OpenSSL library (or a
-# modified version of that library), containing parts covered by the
-# terms of the OpenSSL or SSLeay licenses, the licensors of the Program
-# grant you additional permission to convey the resulting work.
-# Corresponding Source for a non-source form of such a combination
-# shall include the source code for the parts of OpenSSL used as well
-# as that of the covered work.
-
 # git-lock script which will delegate all commands to lock-client-lib.sh
 
 LOG_LEVEL_QUIET=0
@@ -47,17 +19,21 @@ if [ -n "$param" ]; then
 	esac
 fi
 
-# Get the log device, so that we can redirect logging message directly to the tty device
-# We can't use tty to get the log device, because tty is not available everywhere e.g. in MinGW
-ttyDevice=$(perl -e 'use POSIX qw(ttyname); print POSIX::ttyname(2);')
+# Get the log device, so that we can redirect logging messages directly to the tty device.
+# In MinGW there is not /dev/tty available so we try a perl command if that is installed
+# If not /dev/tty and no perl is available we'll redirect all messages to a log file
+perlAvailable=$(perl -v)
+if [ "$?" = 0 ]; then
+	ttyDevice=$(perl -e 'use POSIX qw(ttyname); print POSIX::ttyname(2);')
+elif [ -e "/dev/tty" ]; then
+	ttyDevice="/dev/tty"
+else
+	ttyDevice="$(pwd)/git-lock.log"
+fi
 
 # Function to log messages to the proper output device
 logMessage() {
-	if [ -n "$ttyDevice" ]; then
-		echo "$1" > "$ttyDevice"
-	else
-		echo "$1" >> "git-lock.log"
-	fi
+	echo "$1" > "$ttyDevice"
 }
 
 # Function to ask the user for input
@@ -69,8 +45,16 @@ askForInput() {
 	echo "$answer"
 }
 
+# Check if the working dir is set
+if [ -z "${LOCK_CLIENT_BIN_DIR:-}" ]; then
+	errorMsg="Environment variable LOCK_CLIENT_BIN_DIR not found"
+	logMessage "$errorMsg"
+	echo "$errorMsg"
+	exit 1
+fi
+
 # Import the lock-client functions
-. "${LOCK_CLIENT_BIN_DIR}"lock-client-lib.sh
+. "${LOCK_CLIENT_BIN_DIR}"/lock-client-lib.sh
 
 returnValue=$(lockClient "$@")
 returnCode=$?

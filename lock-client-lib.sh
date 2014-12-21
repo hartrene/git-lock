@@ -1,90 +1,9 @@
 #!/bin/bash
 
-# Copyright 2013 Rene Hartmann
-# 
-# This file is part of git-lock.
-# 
-# git-lock is free software: you can redistribute it and/or modify
-# it under the terms of the GNU General Public License as published by
-# the Free Software Foundation, either version 3 of the License, or
-# (at your option) any later version.
-# 
-# git-lock is distributed in the hope that it will be useful,
-# but WITHOUT ANY WARRANTY; without even the implied warranty of
-# MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
-# GNU General Public License for more details.
-# 
-# You should have received a copy of the GNU General Public License
-# along with git-lock.  If not, see <http://www.gnu.org/licenses/>.
-# 
-# Additional permission under GNU GPL version 3 section 7:
-# 
-# If you modify the Program, or any covered work, by linking or
-# combining it with the OpenSSL project's OpenSSL library (or a
-# modified version of that library), containing parts covered by the
-# terms of the OpenSSL or SSLeay licenses, the licensors of the Program
-# grant you additional permission to convey the resulting work.
-# Corresponding Source for a non-source form of such a combination
-# shall include the source code for the parts of OpenSSL used as well
-# as that of the covered work.
-
-# git-lock functions
-#
-# Available git-lock commands:
-#
-# init
-#	Initializes git-lock
-# init-project
-#	Initializes the project and release on the lock-server
-# add [FILE]
-#	Adds a file to be lockable
-# lock [FILE]
-#	Locks a file on the lock-server, so that no other user can edit this file until the lock is released (unlock).
-# unlock [FILE]
-#	Unlocks a previously locked file
-# cancel [FILE]
-#	Cancel/release a lock
-# remove [FILE]
-#	Removes a file to be lockable
-#
-# Lock-server commands:
-# 
-# lookup-server-pubkey
-#	Requests the lock-servers public key
-# lookup-projects
-#	Logs all existing projects and releases on the lock-server
-# lookup-project [PROJECT]
-# 	Lookup of the project directory on the lock-server
-# lookup-release [PROJECT] [RELEASE]
-#	Lookup of the release directory on the lock-server
-#
-# Configuration commands:
-#
-# context
-#	Logs all git-lock properties
-# set-property
-#	Sets/Overrides the given git-lock properties
-#		-project [PROJECT_NAME] 
-#   	-release [RELEASE_NAME] 
-#   	-remote-user [REMOTE_USER] 
-#   	-server [SERVER_ADDRESS] 
-#   	-ssh-port [SSH_PORT]
-# switch-project [PROJECT_NAME]
-#	Changes the project of that branch
-# switch-release [RELEASE_NAME]
-#	Changes the release of that branch
-# switch-remote-user [REMOTE_USER]
-#	Changes the lock-server username
-# switch-server [SERVER_ADDRESS]
-# 	Changes the address of the lock-server
-# switch-ssh-port [SERVER_SSH_PORT]
-#	Changes the ssh port of the lock-server
+# This file contains all git-lock client functions
 
 # Import util functions
-. "${LOCK_CLIENT_BIN_DIR}lock-util.sh"
-
-# Property file name which holds informatin of the current project/release and detials of the server connectivity
-PROPERTY_FILE=".git-lock.properties"
+. "${LOCK_CLIENT_BIN_DIR}/lock-util.sh"
 
 REMOTE_USER_PROPERTY_KEY="REMOTE_USER"
 SERVER_ADDRESS_PROPERTY_KEY="SERVER_ADDRESS"
@@ -103,7 +22,53 @@ REQUIRED_PROPERTIES=(
 	"$RELEASE_PROPERTY_KEY:In which release is this branch going"
 );
 
-# Main function which dispatches calls to all lock-client functions
+# Prints all commands
+lockClientHelp() {
+	echo "-- Available git-lock commands:"
+	echo "init"
+	echo "  Initializes git-lock"
+	echo "init --bare"
+	echo "  Initializes git-lock in a bare repository"
+	echo "lock [FILE]"
+	echo "  Locks a file on the lock-server, so that no other user can edit this file until the lock is released (unlock)."
+	echo "unlock [FILE]"
+	echo "  Unlocks a previously locked file"
+	echo "cancel [FILE]"
+	echo "  Cancel/release a lock"
+	echo "status"
+	echo "  Show the project/release and all locks of the user"
+	echo ""
+	echo "-- Lock-server commands:"
+	echo "all-locks"
+	echo "  Show locks of all user"
+	echo "lookup-projects"
+	echo "  Logs all existing projects and releases on the lock-server"
+	echo "lookup-project-dir [PROJECT]"
+	echo "  Lookup of the project directory on the lock-server"
+	echo "lookup-release-dir [PROJECT] [RELEASE]"
+	echo "  Lookup of the release directory on the lock-server"
+	echo ""
+	echo "-- Configuration commands:"
+	echo "properties"
+	echo "  Logs all git-lock properties"
+	echo "set-property"
+	echo "  Sets/Overrides the given git-lock properties"
+	echo "  	-project [PROJECT_NAME]"
+	echo "  	-release [RELEASE_NAME]"
+	echo "  	-remote-user [REMOTE_USER]"
+	echo "  	-server [SERVER_ADDRESS]"
+	echo "  	-ssh-port [SSH_PORT]"
+	echo "switch-project [PROJECT_NAME] [RELEASE_NAME]"
+	echo "  Changes the project of that branch"
+	echo "switch-remote-user [REMOTE_USER]"
+	echo "  Changes the lock-server username"
+	echo "switch-server [SERVER_ADDRESS]"
+	echo "  Changes the address of the lock-server"
+	echo "switch-ssh-port [SERVER_SSH_PORT]"
+	echo "  Changes the ssh port of the lock-server"
+}
+
+# Main function which dispatches calls to all lock-client functions.
 # This function gets called from the shell script git-lock or it gets called directly from the unit-tests.
 lockClient() {
 	command="$1"
@@ -113,28 +78,34 @@ lockClient() {
 	
 	# Dispatch the incomming command to the correct function
 	case "$command" in
-		init) lockClientInit "$@";;
-		init-project) lockClientInitServer "$@";;
-		add) lockClientAdd "$@";;
+		--help) lockClientHelp "$@";;
+		init) 
+			if [ "${1:-}" = "--bare" ]; then
+				shift
+				lockClientInitBare "$@"
+			else
+				lockClientInit "$@"
+			fi
+			;;
+		create-project) lockClientCreateProject "$@";;
 		lock) lockClientLock "$@";;
 		unlock) lockClientUnlock "$@";;
 		cancel) lockClientCancel "$@";;
-		remove) lockClientRemove "$@";;
+		status) lockClientStatus "$@";;
+		all-locks) lockClientShowAllLocks "$@";;
 		
 		# Commands for property manipulation
-		context) lockClientContext "$@";;
+		properties) lockClientProperties "$@";;
 		set-property) lockClientSetProperty "$@";;
-		switch-project) lockClientSetProperty -p "$@";;
-		switch-release) lockClientSetProperty -r "$@";;
-		switch-remote-user) lockClientSetProperty -ru "$@";;
+		switch-project) lockClientSwitchProject "$@";;
+		switch-remote-user) lockClientSetProperty -remote-user "$@";;
 		switch-server) lockClientSetProperty -server "$@";;
 		switch-ssh-port) lockClientSetProperty -ssh-port "$@";;
 		
 		# Commands for questioning the server
-		lookup-server-pubkey) lockClientLookupServerPubkey "$@";;
 		lookup-projects) lockClientLookupServer "projects" "$@";;
-		lookup-project) lockClientLookupServer "project" "$@";;
-		lookup-release) lockClientLookupServer "release" "$@";;
+		lookup-project-dir) lockClientLookupServer "project-dir" "$@";;
+		lookup-release-dir) lockClientLookupServer "release-dir" "$@";;
 		
 		*)
 			echo "git-lock unknown command: $command"
@@ -142,7 +113,7 @@ lockClient() {
 	esac
 }
 
-# Lookup of lock-server details
+# Lookup of lock-server details.
 # lookup-project [PROJECT]: Lookup of the project directory on the lock-server
 # lookup-release [PROJECT] [RELEASE]: Lookup of the release directory on the lock-server
 # lookup-projects: Logs all existing projects and releases on the lock-server
@@ -151,14 +122,15 @@ lockClient() {
 # @return_value Project or release directory
 lockClientLookupServer() {
 	local lookupProperty="${1:-}"
+	# Check that at least the CMD was given
 	checkParameter 1 "lockClientLookupServer() [CMD]" "$lookupProperty"
 	
 	shift
 	case "$lookupProperty" in
-		project)
+		project-dir)
 			checkParameter 1 "lookup-project [PROJECT]" "$@"
 			returnValue=$(executeOnServer lookup-project-dir "'$1'");;
-		release)
+		release-dir)
 			checkParameter 2 "lookup-release [PROJECT] [RELEASE]" "$@"
 			returnValue=$(executeOnServer lookup-release-dir "'$1'" "'$2'");;
 		projects)
@@ -173,21 +145,19 @@ lockClientLookupServer() {
 	return $returnCode
 }
 
-# Returns all git-lock properties
+# Returns all git-lock properties.
 #
 # @return_codes 0=success 1=failure
 # @return_value git-lock properties
-lockClientContext() {
-	checkParameter 0 "context" "$@"
-	
+lockClientProperties() {
+	checkParameter 0 "properties" "$@"
 	# Get the required properties
-	lockClientNeedPropertyFilePath propertyFile
-	
-	local contextData="$(cat "$propertyFile")"
-	echo "$contextData"
+	needPropertyFilePath propertyFile
+	local data="$(cat "$propertyFile")"
+	echo "$data"
 }
 
-# Sets/Overrides git-lock properties
+# Sets/Overrides git-lock properties.
 #   -project [PROJECT_NAME] 
 #   -release [RELEASE_NAME] 
 #   -remote-user [REMOTE_USER] 
@@ -198,7 +168,7 @@ lockClientContext() {
 # @return_value nothing
 lockClientSetProperty() {
 	# Check if property file exists
-	lockClientGetPropertyFilePath propertyFile
+	getPropertyFilePath propertyFile $PROPERTY_FILE "$@"
 		
 	if [ ! -e "$propertyFile" ]; then
 		returnValue=$(touch "$propertyFile")
@@ -216,66 +186,44 @@ lockClientSetProperty() {
 			break
 		fi
 		
-		if [ -z "$propertyValue" ]; then
-			echo "No value given for switch$propertyId"
-			exit 1
-		fi
-		
 		case "$propertyId" in
-			-p | -project) propertyKey="$PROJECT_PROPERTY_KEY";;
-			-r | -release) propertyKey="$RELEASE_PROPERTY_KEY";;
+			-p  | -project) propertyKey="$PROJECT_PROPERTY_KEY";;
+			-r  | -release) propertyKey="$RELEASE_PROPERTY_KEY";;
 			-ru | -remote-user) propertyKey="$REMOTE_USER_PROPERTY_KEY";;
-			-s | -server) propertyKey="$SERVER_ADDRESS_PROPERTY_KEY";;
+			-s  | -server) propertyKey="$SERVER_ADDRESS_PROPERTY_KEY";;
 			-sp | -ssh-port) propertyKey="$SSH_PORT_PROPERTY_KEY";;
 			*)
 				echo "Error unknown property: $propertyId"
 				exit 1;;
 		esac
 		
+		if [ -z "$propertyValue" ]; then
+			echo "No value given for switch$propertyId"
+			exit 1
+		fi
+		
 		writeProperty "$propertyFile" "$propertyKey" "$propertyValue"
 		logInfo "Property $propertyKey was set to: $propertyValue"
 		
 		# Shift to the next pair of properties
-		shift 2
+		shift 2	
 	done
 }
 
-# Requests the lock-servers public key
-#
-# @param FILE File path in which the public key will be stored
-# @return_codes 0=success 1=failure
-# @return_value nothing
-lockClientLookupServerPubkey() {
-	checkParameter 1 "lookup-server-pubkey [FILE]" "$@"
-	local fileToStore="$1"
-	
-	# Send request to the server
-	pubkey=$(executeOnServer pubkey)
-	expectSuccess "Error while requesting the server public key occurred: $pubkey" $?
-	
-	# Save the pubkey
-	echo "$pubkey" > "${fileToStore}"
-}
-
-# Initializes git-lock
-# Creates the project and release on the lock-server
+# Initializes git-lock.
+# Creates the project and release on the lock-server.
 # Possibile to give the required properties as arguments: 
 #   -project [PROJECT_NAME] 
 #   -release [RELEASE_NAME] 
 #   -remote-user [REMOTE_USER] 
 #   -server [SERVER_ADDRESS] 
 #   -ssh-port [SSH_PORT]
-# If some properties were not given as arguments, it will ask to enter the missing properties
+# If some properties were not given as arguments, it will ask to enter the missing properties.
 #
 # @return_codes 0=success 1=failure
 # @return_value nothing
 lockClientInit() {
-	checkParameter 0 "init" "$@"
 	logInfo "Init git-lock"
-	
-	# Get git-root
-	discoverGitRoot gitRoot
-	logDebug "Found git root in: $gitRoot"
 	
 	# Store the parameter if some where given
 	lockClientSetProperty "$@"
@@ -284,108 +232,64 @@ lockClientInit() {
 	askForAllMissingProperties
 	
 	# Run the server init
-	lockClientInitServer
+	lockClientCreateProject
+	
+	# Install hooks
+	lockClientInitHooks
 	
 	logInfo "git-lock init done"
 }
 
-# Initializes the project and release on the lock-server
+# Initializes git-lock in a bare repository.
+# Possibile to give the required properties as arguments: 
+#   -remote-user [REMOTE_USER] 
+#   -server [SERVER_ADDRESS] 
+#   -ssh-port [SSH_PORT]
+# If some properties were not given as arguments, it will ask to enter the missing properties.
+#
+# @return_codes 0=success 1=failure
+# @return_value nothing
+lockClientInitBare() {
+	logInfo "Init git-lock in a bare repository"
+	
+	# Store the parameter if some where given
+	lockClientSetProperty "$@"
+	
+	# Ask for all missing server properties
+	askForAllMissingServerProperties
+	
+	# Install hooks
+	lockClientInitHooks
+	
+	logInfo "git-lock init --bare done"
+}
+
+# Creates the project and release on the lock-server.
 #
 # @return_codes 0=success 1=failure
 # @return_value return value from the server
-lockClientInitServer() {
+lockClientCreateProject() {
 	# Store the parameter if some where given
 	lockClientSetProperty "$@"
 	
 	# Get the required properties
-	lockClientNeedPropertyFilePath propertyFile
+	needPropertyFilePath propertyFile
 	needProperty project "$propertyFile" "$PROJECT_PROPERTY_KEY"
 	needProperty release "$propertyFile" "$RELEASE_PROPERTY_KEY"
-		
+	
+	# Get branch
+	branch=$(git branch | grep "*" | cut -d " " -f2)
+	if [ "$branch" = "" ]; then
+		branch="master"
+	fi
+			
 	# Run the server init
-	logDebug "Init project and release on server"
-	returnValue=$(executeOnServer init "'$project'" "'$release'")
-	expectSuccess "Server wasn't able to init the project $returnValue" $?
-}
-
-# Adds a file to be lockable
-# Also is used to add a previously removed/banned file.
-# The file will be readonly if the add was successful.
-#
-# @param FILE File to add
-# @return_codes 0=success 1=failure
-# @return_value nothing
-lockClientAdd() {
-	checkParameter 1 "add [FILE]" "$@"
-	local fileToAdd="$1"
-	
-	logInfo "Add file: $fileToAdd"
-	
-	# Check if the file exists
-	expectFileExists "$fileToAdd" "File to add can't be found: $fileToAdd"
-	
-	# Check if init was running
-	lockClientNeedPropertyFilePath propertyFile
-	
-	# Get the git user name
-	user=$(git config --global user.name)
-	expectSuccess "Could not find the git username? $user" $?
-	
-	# Get the hash of the filename
-	fileNameHash=$(buildFilepathHash "$fileToAdd")
-	expectSuccess "Error while creating the file name hash occurred: $fileNameHash" $?
-	
-	# Get the hash of the file content
-	fileContentHash=$(git hash-object "$fileToAdd")
-	expectSuccess "Error while creating the file content hash occurred: $fileContentHash" $?
-	
-	# Get the required properties
-	lockClientNeedPropertyFilePath propertyFile
-	needProperty project "$propertyFile" "$PROJECT_PROPERTY_KEY"
-	needProperty release "$propertyFile" "$RELEASE_PROPERTY_KEY"
-	
-	# Check if file was removed previously, in that case we have to remove the ban on the server
-	local banConfirmationSignatureFile=".${fileToAdd}.lock-remove-confirm"
-	local banConfirmationSignature=""
-	if [ -e "$banConfirmationSignatureFile" ]; then
-		banConfirmationSignature=$(cat "$banConfirmationSignatureFile")
-	else 
-		# Check if the file is already added
-		ls ".${fileToAdd}.lock"* &> /dev/null
-		if [ $? -eq 0 ]; then
-			echo "File already added"
-			exit 1
-		fi
-	fi
-	
-	# Send add request to the server
-	logInfo "Send add request to the server"
-	changeConfirmationSignature=$(executeOnServer add "'$user'" "'$project'" "'$release'" "$fileNameHash" "$fileContentHash" "$banConfirmationSignature")
-	expectSuccess "Server wasn't able to add the file: $changeConfirmationSignature" $?
-	
-	# Save the change confirmation signature
-	logInfo "File successfully added to the server"
-	local changeConfirmationSignatureFile=".${fileToAdd}.lock-change-confirm"
-	logDebug "Save change confirmation signature: $changeConfirmationSignature to: $changeConfirmationSignatureFile"
-	echo "$changeConfirmationSignature" > "$changeConfirmationSignatureFile"
-	
-	# Set the file to readonly
-	logInfo "Set file to readonly: $fileToAdd"
-	chmod ugo-w "$fileToAdd"
-	
-	# If the file was banned before, remove the ban on the client side
-	if [ -e "$banConfirmationSignatureFile" ]; then
-		rm "$banConfirmationSignatureFile"
-	fi
+	logDebug "Create project and release on server"
+	returnValue=$(executeOnServer init-project "'$branch'" "'$project'" "'$release'")
+	expectSuccess "Server wasn't able to create the project and releaes $returnValue" $?
 }
 
 # Locks a file on the lock-server, so that no other user can edit this file until the lock is released (unlock).
-# It is supported to directly lock a never added file.
-# It stores the lock confirmation signature (lcs) from the lock-server, so that only this client who has the lcs can release the lock (unlock).
-# It will make the file writable, if it was readonly before.
-#
-# It stores the project and release for which the lock was requested, so that it doesn't need to be given again on unlock or cancel.
-# This makes it possible (not recommended), to switch the project or release after the file was locked and unlock the file later.
 #
 # @param FILE File to lock
 # @return_codes 0=success 1=failure
@@ -394,76 +298,41 @@ lockClientLock() {
 	checkParameter 1 "lock [FILE]" "$@"
 	local fileToLock="$1"
 	
-	logInfo "Lock file: $fileToLock"
-	
 	# Check if the file exists
-	expectFileExists "$fileToLock" "File to lock file can't be found: $fileToLock"
-	
-	# Check if the file was added before
-	ls ".${fileToLock}.lock"* &> /dev/null
-	if [ ! $? -eq 0 ]; then
-		lockClientAdd "$fileToLock"
-	fi
-	
-	# Check that the file is not already locked
-	local lockSignatureFile=".${fileToLock}.lock"
-	if [ -e "$lockSignatureFile" ]; then
-		echo "File is already locked"
-		exit 1
-	fi
+	expectFileExists "$fileToLock" "File to lock doesn't exist: $fileToLock"
 	
 	# Get the required properties
-	lockClientNeedPropertyFilePath propertyFile
+	needPropertyFilePath propertyFile
 	needProperty project "$propertyFile" "$PROJECT_PROPERTY_KEY"
 	needProperty release "$propertyFile" "$RELEASE_PROPERTY_KEY"
+	
+	logInfo "Lock file: $fileToLock for project: $project and release: $release"
 		
 	# Get the git user name
-	user=$(git config --global user.name)
+	user=$(git config user.name)
 	expectSuccess "Could not find the git username? $user" $?
 	
-	# Get the hash of the filename
-	fileNameHash=$(buildFilepathHash "$fileToLock")
-	expectSuccess "Error while creating the file name hash occurred: $fileNameHash" $?
+	# Build the file path of the given file including the subdirectory starting from git root
+	relativeFilepath=$(discoverRelativeFilepathFromGitRoot "$fileToLock")
+	expectSuccess "Error while discovering the relative filepath from git root occurred: $relativeFilepath" $?
+	
+	# Get the hash of the file content
+	fileContentHash=$(git hash-object "$fileToLock")
+	expectSuccess "Error while creating the file content hash occurred: $fileContentHash" $?
 	
 	# Send lock request to the server
 	logInfo "Send lock request to the server"
+	lockResult=$(executeOnServer lock "'$user'" "'$project'" "'$release'" "'$relativeFilepath'" "'$fileContentHash'")
+	expectSuccess "Server wasn't able to lock the file: $lockResult" $?
 	
-	# Check if the file was changed before
-	local lastChangeConfirmationSignatureFile=".${fileToLock}.lock-change-confirm"
-	if [ -e "$lastChangeConfirmationSignatureFile" ]; then
-		# File was changed before, send last change confirmation signature
-		lastChangeConfirmationSignature=$(cat "$lastChangeConfirmationSignatureFile")
-		lockSignature=$(executeOnServer lock "'$user'" "'$project'" "'$release'" "$fileNameHash" "$lastChangeConfirmationSignature")
-	else 
-		# File was never locked before, don't send any change confirmation signature
-		lockSignature=$(executeOnServer lock "'$user'" "'$project'" "'$release'" "$fileNameHash")
-	fi 
-	
-	# Check if server execution was successful
-	expectSuccess "Server wasn't able to lock the file: $lockSignature" $?
-	
-	# Save the lock signature
-	logInfo "File successfully locked on server"
-	logDebug "Save lock signature: $lockSignature to $lockSignatureFile"
-	echo "$lockSignature" > "$lockSignatureFile"
-	
-	# Save the project and release for which the file was locked
-	# If the user decides to switch the project before unlocking, we're not lost
-	logDebug "Save project and release for which this lock was done"
-	local lockDetailsFile=".${fileToLock}.lock-details"
-	touch "$lockDetailsFile"
-	writeProperty "$lockDetailsFile" "$PROJECT_PROPERTY_KEY" "$project"
-	writeProperty "$lockDetailsFile" "$RELEASE_PROPERTY_KEY" "$release"
-	
-	# Make the file writable
+	# Make file writable
 	logInfo "Make file writable: $fileToLock"
-	chmod u+w "$fileToLock"
+	chmod ugo+w "$fileToLock"
+	
 }
 
-# Unlocks a previously locked file 
+# Unlocks a previously locked file.
 # Now other users can lock the file again, but only if they updated to the last unlocked version of the file.
-# It stores the unlock-confirmation-signature (ucs), with which new locks of this file can be requested.
-# After unlocking the file will be readonly again. 
 #
 # @param FILE File to unlock
 # @return_codes 0=success 1=failure
@@ -471,223 +340,151 @@ lockClientLock() {
 lockClientUnlock() {
 	checkParameter 1 "unlock [FILE]" "$@"
 	local fileToUnlock="$1"
-	
 	logInfo "Unlock file: $fileToUnlock"
 	
 	# Check if the file exists
 	expectFileExists "$fileToUnlock" "File $fileToUnlock can't be found"
 	
-	# Check if lock signature can be found
-	local lockSignatureFile=".${fileToUnlock}.lock"
-	expectFileExists "$lockSignatureFile" "File is not locked."
-	
-	# Check if the lock details file can be found
-	local lockDetailsFile=".${fileToUnlock}.lock-details"
-	expectFileExists "$lockDetailsFile" "Lock details file couldn't be found."
-	
 	# Get the required properties
-	lockClientNeedPropertyFilePath propertyFile
-	needProperty project "$lockDetailsFile" "$PROJECT_PROPERTY_KEY"
-	needProperty release "$lockDetailsFile" "$RELEASE_PROPERTY_KEY"
+	needPropertyFilePath propertyFile
+	needProperty project "$propertyFile" "$PROJECT_PROPERTY_KEY"
+	needProperty release "$propertyFile" "$RELEASE_PROPERTY_KEY"
 		
 	# Get the git user name
-	user=$(git config --global user.name)
+	user=$(git config user.name)
 	expectSuccess "Could not find the git username? $user" $?
 	
-	# Get the hash of the filename
-	fileNameHash=$(buildFilepathHash "$fileToUnlock")
-	expectSuccess "Error while creating the file name hash occurred: $fileNameHash" $?
+	# Build the file path of the given file including the subdirectory starting from git root
+	relativeFilepath=$(discoverRelativeFilepathFromGitRoot "$fileToUnlock")
+	expectSuccess "Error while discovering the relative filepath from git root occurred: $relativeFilepath" $?
 	
 	# Get the hash of the file content
 	fileContentHash=$(git hash-object "$fileToUnlock")
 	expectSuccess "Error while creating the file content hash occurred: $fileContentHash" $?
 	
-	# Get the lock signature
-	local lockSignature=$(cat "$lockSignatureFile")
-	
 	# Send unlock request to the server
 	logInfo "Send unlock request to the server"
-	changeConfirmationSignature=$(executeOnServer unlock "'$user'" "'$project'" "'$release'" "$fileNameHash" "$fileContentHash" "$lockSignature")
-	expectSuccess "Server wasn't able to unlock the file: $changeConfirmationSignature" $?
-	
-	# Save the change confirmation signature
-	logInfo "File successfully unlocked on server"
-	local changeConfirmationSignatureFile=".${fileToUnlock}.lock-change-confirm"
-	logDebug "Save change confirmation signature: $changeConfirmationSignature to: $changeConfirmationSignatureFile"
-	echo "$changeConfirmationSignature" > "$changeConfirmationSignatureFile"
-	
-	# Cleanup the filesystem
-	rm "$lockSignatureFile"
-	rm "$lockDetailsFile"
+	unlockResult=$(executeOnServer unlock "'$user'" "'$project'" "'$release'" "'$relativeFilepath'" "'$fileContentHash'")
+	expectSuccess "Server wasn't able to unlock the file: $unlockResult" $?
 	
 	# Set the file to readonly
 	logInfo "Set file to readonly: $fileToUnlock"
 	chmod ugo-w "$fileToUnlock"
 }
 
-# Cancel/release a lock
+# Cancel/release a lock.
 # Releases the lock on the lock-server, so that other user can request locks for this file again.
-# 
-# No new change-confirmation-signature will be created.
-# 
 # 
 # @param FILE File for which the lock needs to be canceled
 # @return_codes 0=success 1=failure
-# @return_value
+# @return_value nothing
 lockClientCancel() {
 	checkParameter 1 "cancel [FILE]" "$@"
 	local fileToCancel="$1"
-	
 	logInfo "Cancel lock of file: $fileToCancel"
 	
 	# Check if the file exists
 	expectFileExists "$fileToCancel" "File $fileToCancel can't be found"
 	
-	# Check if lock signature can be found
-	local lockSignatureFile=".${fileToCancel}.lock"
-	expectFileExists "$lockSignatureFile" "File is not locked."
-	
-	# Check if the lock details file can be found
-	local lockDetailsFile=".${fileToCancel}.lock-details"
-	expectFileExists "$lockDetailsFile" "Lock details file couldn't be found."
-	
 	# Get the required properties
-	lockClientNeedPropertyFilePath propertyFile
-	needProperty project "$lockDetailsFile" "$PROJECT_PROPERTY_KEY"
-	needProperty release "$lockDetailsFile" "$RELEASE_PROPERTY_KEY"
+	needPropertyFilePath propertyFile
+	needProperty project "$propertyFile" "$PROJECT_PROPERTY_KEY"
+	needProperty release "$propertyFile" "$RELEASE_PROPERTY_KEY"
 	
-	# Get the hash of the filename
-	fileNameHash=$(buildFilepathHash "$fileToCancel")
-	expectSuccess "Error while creating the file name hash occurred: $fileNameHash" $?
+	# Build the file path of the given file including the subdirectory starting from git root
+	relativeFilepath=$(discoverRelativeFilepathFromGitRoot "$fileToCancel")
+	expectSuccess "Error while discovering the relative filepath from git root occurred: $relativeFilepath" $?
 	
-	# Get the lock signature
-	local lockSignature=$(cat "$lockSignatureFile")
+	# Get the hash of the file content
+	fileContentHash=$(git hash-object "$fileToCancel")
+	expectSuccess "Error while creating the file content hash occurred: $fileContentHash" $?
 	
 	# Send cancel request to the server
 	logInfo "Send cancel request to the server"
-	cancelReturnValue=$(executeOnServer cancel "'$project'" "'$release'" "$fileNameHash" "$lockSignature")
-	expectSuccess "Server wasn't able to cancel the lock: $cancelReturnValue" $?
-	
-	# Delete the unlock files
-	rm "$lockSignatureFile"
-	rm "$lockDetailsFile"
+	cancelResult=$(executeOnServer cancel "'$project'" "'$release'" "'$relativeFilepath'" "'$fileContentHash'")
+	expectSuccess "Server wasn't able to cancel the lock: $cancelResult" $?
 	
 	# Set the file to readonly
 	logInfo "Set file to readonly: $fileToCancel"
 	chmod ugo-w "$fileToCancel"
 }
 
-# Removes a file to be lockable
-# This file will be banned on the lock-server, so that no more locks for this file will be accepted.
-# If the file needs to be locked again, just use git-lock add [FILE]
-# 
-# @param FILE File for which no lock requests should be allowed anymore
+# Copies the hooks into the .git directory.
+#
 # @return_codes 0=success 1=failure
 # @return_value nothing
-lockClientRemove() {
-	checkParameter 1 "remove [FILE]" "$@"
-	local fileToRemove="$1"
+lockClientInitHooks() {
+	discoverGitConfig gitConfig
+	logDebug "Copy hooks to: ${gitConfig}hooks"
+	cp "${LOCK_CLIENT_BIN_DIR}/pre-receive" "${gitConfig}hooks"
+	chmod u+x "${gitConfig}hooks/pre-receive"
+}
+
+# Shows the current project, release and the locks of the user.
+#
+# @return_codes 0=success 1=failure
+# @return_value Project, release and list of file locks
+lockClientStatus() {
+	checkParameter 0 "lockClientStatus()" "$@"
 	
-	logInfo "Remove file: $fileToRemove"
-	
-	# Check if file was already removed
-	local banConfirmationSignatureFile=".${fileToRemove}.lock-remove-confirm"
-	if [ -e "$banConfirmationSignatureFile" ]; then
-		echo "File already removed"
-		exit 1
-	fi
-	
-	# Check if the file exists
-	expectFileExists "$fileToRemove" "File to remove file can't be found: $fileToRemove"
-	
-	# Check if the file was locked before
-	ls ".${fileToRemove}.lock"* &> /dev/null
-	if [ ! $? -eq 0 ]; then
-		echo "Can only remove files which were added (git-lock add) or locked (git-lock lock) before."
-		exit 1
-	fi
-	
-	# Get the required properties
-	lockClientNeedPropertyFilePath propertyFile
+	# Log Project and Release
+	needPropertyFilePath propertyFile
 	needProperty project "$propertyFile" "$PROJECT_PROPERTY_KEY"
 	needProperty release "$propertyFile" "$RELEASE_PROPERTY_KEY"
-		
+	
 	# Get the git user name
-	user=$(git config --global user.name)
+	user=$(git config user.name)
 	expectSuccess "Could not find the git username? $user" $?
 	
-	# Get the hash of the filename
-	fileNameHash=$(buildFilepathHash "$fileToRemove")
-	expectSuccess "Error while creating the file name hash occurred: $fileNameHash" $?
+	logDebug "Request user locks from server"
+	result=$(executeOnServer show-user-locks "'$user'")
+	expectSuccess "Server wasn't able get the user locks: $result" $?
 	
-	# Get the hash of the file content
-	fileContentHash=$(git hash-object "$fileToRemove")
-	expectSuccess "Error while creating the file content hash occurred: $fileContentHash" $?
-	
-	# Send ban request to the server
-	logInfo "Send ban request to the server"
-	
-	# Check if the file was changed before
-	local lastChangeConfirmationSignatureFile=".${fileToRemove}.lock-change-confirm"
-	if [ -e "$lastChangeConfirmationSignatureFile" ]; then
-		# File was changed before, send last change confirmation signature
-		lastChangeConfirmationSignature=$(cat "$lastChangeConfirmationSignatureFile")
-		banConfirmationSignature=$(executeOnServer ban "'$user'" "'$project'" "'$release'" "$fileNameHash" "$fileContentHash" "$lastChangeConfirmationSignature")
-	else 
-		# File was never changed before, don't send any change confirmation signature
-		banConfirmationSignature=$(executeOnServer ban "'$user'" "'$project'" "'$release'" "$fileNameHash" "$fileContentHash")
-	fi 
-	
-	# Check if server execution was successful
-	expectSuccess "Server wasn't able to ban the file: $banConfirmationSignature" $?
-	
-	# Save the ban confirmation signature
-	logInfo "File successfully banned on server"
-	logDebug "Save ban confirmation signature: $banConfirmationSignature to $banConfirmationSignatureFile"
-	echo "$banConfirmationSignature" > "$banConfirmationSignatureFile"
-	
-	# Cleanup the filesystem
-	if [ -e "$lastChangeConfirmationSignatureFile" ]; then
-		rm "$lastChangeConfirmationSignatureFile"
-	fi
-	
-	logInfo "File successfully banned on lock server"
+	echo "Project: $project"
+	echo "Release: $release"
+	echo "-- Locked files:"
+	echo "$result"
 }
 
-
-# Creates the filepath of the git-lock property file
+# Shows locks of all users
 #
-# @param RESULT_VARIABLE variable in which the path will be stored
+# @return_codes 0=success 1=failure
+# @return_value List of all locked files
+lockClientShowAllLocks() {
+	checkParameter 0 "lockClientShowAllLocks()" "$@"
+	logDebug "Request all locks from server"
+	result=$(executeOnServer all-locks)
+	expectSuccess "Server wasn't able get all locks: $result" $?
+	echo "$result"
+}
+
+# Switches the project/release and create those on the server if not already exists.
+#
+# @param PROJECT Project to switch to
+# @param RELEASE Release to switch to
 # @return_codes 0=success 1=failure
 # @return_value nothing
-lockClientGetPropertyFilePath() {
-	checkParameter 1 "lockClientGetPropertyFilePath() [RESULT_VARIABLE]" "$@"
-	local resultVariable=$1; eval $resultVariable=
+lockClientSwitchProject() {
+	checkParameter 2 "lockClientSwitchProject() [PROJECT] [RELEASE]" "$@"
+	local project="$1"; local release="$2"
 	
-	discoverGitRoot gitRoot
+	# Get the git user name
+	user=$(git config user.name)
+	expectSuccess "Could not find the git username? $user" $?
 	
-	eval $resultVariable="'${gitRoot}${PROPERTY_FILE}'"
-}
-
-# Create the git-lock properties file path and checks if it exists
-#
-# @param RESULT_VARIABLE variable in which the path will be stored
-# @return_codes 0=file exists 1=file does not exist
-# @return_value nothing
-lockClientNeedPropertyFilePath() {
-	checkParameter 1 "lockClientNeedPropertyFilePath() [RESULT_VARIABLE]" "$@"
-	local resultVariable=$1; eval $resultVariable=
-
-	lockClientGetPropertyFilePath propertyFilePath
-		
-	if [ ! -e "$propertyFilePath" ]; then
-		local errorMsg="Git-lock property file '$propertyFilePath' not found. Run 'git-lock init' first."
-		logError "$errorMsg"
-		echo "$errorMsg"
-		exit 1
+	# Check if user has locks
+	result=$(executeOnServer show-user-locks "'$user'")
+	expectSuccess "Server wasn't able get the user locks: $result" $?
+	if [ "$result" != "User has no locks" ]; then
+		expectSuccess "User still has locks, unable to switch the project. Remove all locks first." 1
 	fi
 	
-	eval $resultVariable="'${propertyFilePath}'"
+	lockClientSetProperty "-p" "$project"
+	lockClientSetProperty "-r" "$release"
+	
+	# Init server to create the new project and release if not already exists
+	lockClientCreateProject
+	expectSuccess "Server wasn't able to init the project $returnValue" $?
 }
 
 # Sends the given command to the lock-server via ssh.
@@ -700,32 +497,35 @@ lockClientNeedPropertyFilePath() {
 # @return_value Return value from the server
 executeOnServer() {
 	# Get property file
-	lockClientNeedPropertyFilePath propertyFile
+	needPropertyFilePath propertyFile
 	
 	# Build ssh command
 	if [ -z "$LOCK_SERVER_SSH_COMMAND" ]; then
 		needProperty remoteUser "$propertyFile" "$REMOTE_USER_PROPERTY_KEY"
 		needProperty serverAddress "$propertyFile" "$SERVER_ADDRESS_PROPERTY_KEY"
 		needProperty sshPort "$propertyFile" "$SSH_PORT_PROPERTY_KEY"
-		sshCommand="ssh "
+		sshCommand="ssh"
 		
 		# Check if a ssh port and remote user was given
 		if [ -n "$sshPort" ]; then sshCommand="$sshCommand -p $sshPort "; fi
 		if [ -n "$remoteUser" ]; then sshCommand="$sshCommand ${remoteUser}@"; fi
 		
-		sshCommand="$sshCommand${serverAddress} \$LOCK_SERVER_BIN_DIR/lock-server.sh"
+		sshCommand="${sshCommand}${serverAddress} \$LOCK_SERVER_BIN_DIR/lock-server.sh"
 	else
 		sshCommand="$LOCK_SERVER_SSH_COMMAND"
 	fi
 
 	# Check if debug logging is requested
-	if [ $logLevel -ge $LOG_LEVEL_DEBUG ]; then
+	if [ "$logLevel" != "" ] && [ "$logLevel" -ge "$LOG_LEVEL_DEBUG" ]; then
 		sshCommand="${sshCommand} --debug"
+	else
+		sshCommand="${sshCommand} --quiet"
 	fi
 	
 	# Execute the command on the server and redirect stderr directly to tty
 	# to see the server log directly (the 'normal' remote function return value goes to stdout)
 	logDebug "[Connector] Send request to server: $@"
+	logDebug "[Connector] Send command to server: $sshCommand $@"
 	if [ -n "$ttyDevice" ]; then
 		returnValue=$($sshCommand "$@" 2> "$ttyDevice")
 	else
@@ -734,12 +534,12 @@ executeOnServer() {
 	local returnCode=$?
 	logDebug "[Connector] Return code from server: $returnCode"
 	logDebug "[Connector] Return value from server: $returnValue"
-	
+		
 	echo "$returnValue"
 	return $returnCode
 }
 
-# Checks if properties are missing in the git-lock properties file.
+# Checks if server properties are missing in the git-lock properties file.
 # If properties are missing, it will ask the user to enter the missing values.
 #
 # The method how the user will be asked has to provided by the parent script with the function askForInput.
@@ -747,9 +547,9 @@ executeOnServer() {
 #
 # @return_codes 0=success 1=failure
 # @return_value nothing
-askForAllMissingProperties() {
+askForAllMissingServerProperties() {
 	# Check if property file exists
-	lockClientGetPropertyFilePath propertyFile
+	getPropertyFilePath propertyFile $PROPERTY_FILE
 	if [ ! -e "$propertyFile" ]; then
 		logInfo "Create git-lock property file: $propertyFile"
 		returnValue=$(touch "$propertyFile")
@@ -760,13 +560,21 @@ askForAllMissingProperties() {
 	for requiredProperty in "${REQUIRED_SERVER_PROPERTIES[@]}"; do
 		local propertyKey=$(echo "$requiredProperty" | cut -f1 -d':')
 		readProperty propertyValue "$propertyFile" "$propertyKey"
-	  
 		if [ $? -ne 0 ]; then
 			local question=$(echo "$requiredProperty" | cut -f2 -d':')
 			local input=$(askForInput "${question}: ")
 			writeProperty "$propertyFile" "$propertyKey" "$input"
 		fi
 	done
+}
+
+# Checks if properties are missing in the git-lock properties file.
+# If properties are missing, it will ask the user to enter the missing values. 
+#
+# @return_codes 0=success 1=failure
+# @return_value nothing
+askForAllMissingProperties() {
+	askForAllMissingServerProperties "$@"
 	
 	# Show all available projects on server
 	logInfo "------------------------------"
@@ -780,7 +588,7 @@ askForAllMissingProperties() {
 	fi
 	logInfo "------------------------------"
 	
-	# Ask the user for all missing properties
+	# Ask the user for all missing client properties
 	for requiredProperty in "${REQUIRED_PROPERTIES[@]}"; do
 		local propertyKey=$(echo "$requiredProperty" | cut -f1 -d':')
 		readProperty propertyValue "$propertyFile" "$propertyKey"

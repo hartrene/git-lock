@@ -1,0 +1,87 @@
+#!/bin/bash
+
+# Git pre-receive hook to check that no file was changed which still has locks
+# or an old version of the file was modified.
+
+# git-lock functions
+. "${LOCK_CLIENT_BIN_DIR}/lock-client-lib.sh"
+
+# Set if log info is set
+LOG_LEVEL_QUIET=0
+LOG_LEVEL_ERROR=1
+LOG_LEVEL_INFO=2
+LOG_LEVEL_DEBUG=3
+logLevel=$LOG_LEVEL_DEBUG
+
+# Logs a debug message, if the log level allows
+logDebug() {
+	if [ $logLevel -ge $LOG_LEVEL_DEBUG ]; then
+		logMessage "$1"
+	fi
+}
+
+# Logs an info message, if the log level allows
+logInfo() {
+	if [ $logLevel -ge $LOG_LEVEL_INFO ]; then
+		logMessage "$1"
+	fi
+}
+
+# Logs an error message, if the log level allows
+logError() {
+	if [ $logLevel -ge $LOG_LEVEL_ERROR ]; then
+		logMessage "$1"
+	fi
+}
+
+# Function to log messages to the proper output device
+logMessage() {
+	# Log messages to stderr so that they don't get mixed up
+	# With the function return value which will be send to stdout
+	echo "  [LOCK SERVER] $1" >&2
+}
+	
+changedFiles=()
+
+# Read all committed changes
+while read oldrev newrev refname; do
+	branch=$(echo "$refname" | cut -d "/" -f 3)
+	
+	# Check against what we have to compare to get the commit changes
+	if [ "$oldrev" = "0000000000000000000000000000000000000000" ]; then
+		# Initial commit: diff against an empty tree object
+		against=4b825dc642cb6eb9a060e54bf8d69288fbee4904
+	else
+		against="$oldrev"
+	fi
+	
+	IFS=$'\n'
+	for diffLine in $(git diff-tree -r "$against" "$newrev"); do
+		unset IFS
+		diffstatcount=1
+		for diffstat in $diffLine; do
+			case $diffstatcount in
+				3) oldContentHash="$diffstat";;
+				4) newContentHash="$diffstat";;
+				5) changeFlag="$diffstat";;
+				6) filename="$diffstat";;
+			esac
+			
+			if [ $diffstatcount -gt 6 ]; then
+				filename="$filename $diffstat"			
+			fi
+			
+			diffstatcount=$(($diffstatcount+1))
+		done
+		filenameHash=$(echo "$filename" | md5sum | cut -f1 -d' ')
+		if [ "$changeFlag" = "D" ]; then
+			contentHash="$oldContentHash"
+		else
+			contentHash="$newContentHash"
+		fi
+		changedFiles+=("$branch" "$changeFlag" "$filenameHash" "$contentHash")
+	done
+	
+	returnValue=$(executeOnServer verify-changes "${changedFiles[@]}")
+	expectSuccess "Server wasn't able to verify the changes: $returnValue" $?
+done

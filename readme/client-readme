@@ -1,0 +1,5 @@
+This archive contains all files of the git-lock client.
+These files have to be distributed to all git clients which like to participate.
+
+bin: 
+	All files in bin need to be on the PATH on each client.
