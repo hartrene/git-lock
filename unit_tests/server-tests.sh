@@ -232,8 +232,8 @@ testServerVerifyChangesShouldSucceedIfNoFileIsLocked() {
 	
 	# Pretend change of a locked file	
 	changedFiles=()
-	changedFiles+=("master A $TEST_FILENAME_HASH $TEST_SECOND_FILE_CONTENT_HASH")
-	changedFiles+=("master A OtherFileHash OtherContent")
+	changedFiles+=("master M $TEST_FILENAME_HASH $TEST_SECOND_FILE_CONTENT_HASH")
+	changedFiles+=("master M OtherFileHash OtherContent")
 	
 	result=$(lockServer verify-changes "${changedFiles[@]}")
 	assertEquals "Server should succeed if no files are locked: $result" 0 $?
@@ -245,7 +245,7 @@ testServerShouldComplainOnChangeVerificationIfUnknownBranchReceived() {
 	assertEquals "Server should return 0 (success) after create: $returnValue" 0 $?
 	# Pretend change of files of an unknown branch
 	changedFiles=()
-	changedFiles+=("foo A $TEST_FILE $TEST_FILENAME_HASH $TEST_FILE_CONTENT_HASH")
+	changedFiles+=("foo M $TEST_FILE $TEST_FILENAME_HASH $TEST_FILE_CONTENT_HASH")
 	lockResult=$(lockServer verify-changes "${changedFiles[@]}")
 	assertEquals "Server should fail change verification if unknown branch sent: $lockResult" 1 $?
 }
@@ -282,7 +282,7 @@ testServerVerifyChangesShouldPassIfAllFilesUnlocked() {
 	
 	# Pretend change of a unlocked file	
 	changedFiles=()
-	changedFiles+=("master A $TEST_FILENAME_HASH $TEST_SECOND_FILE_CONTENT_HASH")
+	changedFiles+=("master M $TEST_FILENAME_HASH $TEST_SECOND_FILE_CONTENT_HASH")
 	
 	result=$(lockServer verify-changes "${changedFiles[@]}")
 	assertEquals "Server should pass change verification if file was unlocked: $result" 0 $?
@@ -303,14 +303,105 @@ testServerVerifyChangesShouldFailIfNotLatestVersionWasReceived() {
 	
 	# Pretend a change of an unlocked file and send an old content hash
 	changedFiles=()
-	changedFiles+=("master A $TEST_FILENAME_HASH $TEST_FILE_CONTENT_HASH")
+	changedFiles+=("master M $TEST_FILENAME_HASH $TEST_FILE_CONTENT_HASH")
 	
 	result=$(lockServer verify-changes "${changedFiles[@]}")
 	assertEquals "Server should fail change verification if an old content hash was received: $result" 1 $?
-	checkExpectedMsg "$TEST_FILE is not the latest version" "$result"
+	checkExpectedMsg "'$TEST_FILE' is not the latest version" "$result"
 	checkExpectedMsg "from user $TEST_USER_NAME" "$result"
 	checkExpectedMsg "at" "$result"
 }
+
+testServerVerifyChangesShouldPassIfFileWasDeleted() {
+	testServerShouldBeAbleToCreateNewReleaseFolder
+	
+	# Change the file
+	echo "asdf" > "$TEST_FILE"
+	assertEquals "Change of the test file should run successfully: $returnValue" 0 $?
+	
+	# Lock and unlock the file
+	result=$(lockServer lock "$TEST_USER_NAME" "$TEST_PROJECT_NAME" "$TEST_RELEASE_NAME" "$TEST_FILE" "$TEST_FILE_CONTENT_HASH")
+	assertEquals "lockServer lock should run successfully: $result" 0 $?
+	result=$(lockServer unlock "$TEST_USER_NAME" "$TEST_PROJECT_NAME" "$TEST_RELEASE_NAME" "$TEST_FILE" "$TEST_SECOND_FILE_CONTENT_HASH")
+	assertEquals "lockServer unlock should run successfully: $result" 0 $?
+	
+	# Pretend delete of a unlocked file	
+	changedFiles=()
+	changedFiles+=("master D $TEST_FILENAME_HASH $TEST_SECOND_FILE_CONTENT_HASH")
+	
+	result=$(lockServer verify-changes "${changedFiles[@]}")
+	assertEquals "Server should pass change of deleted file: $result" 0 $?
+}
+
+testServerVerifyChangesShouldFailIfDeleteWasNotBasedOnTheLatestVersion() {
+	testServerShouldBeAbleToCreateNewReleaseFolder
+	
+	# Change the file
+	echo "asdf" > "$TEST_FILE"
+	assertEquals "Change of the test file should run successfully: $returnValue" 0 $?
+	
+	# Lock and unlock the file
+	result=$(lockServer lock "$TEST_USER_NAME" "$TEST_PROJECT_NAME" "$TEST_RELEASE_NAME" "$TEST_FILE" "$TEST_FILE_CONTENT_HASH")
+	assertEquals "lockServer lock should run successfully: $result" 0 $?
+	result=$(lockServer unlock "$TEST_USER_NAME" "$TEST_PROJECT_NAME" "$TEST_RELEASE_NAME" "$TEST_FILE" "$TEST_SECOND_FILE_CONTENT_HASH")
+	assertEquals "lockServer unlock should run successfully: $result" 0 $?
+	
+	# Pretend a deletion of an unlocked file and send an old content hash
+	changedFiles=()
+	changedFiles+=("master D $TEST_FILENAME_HASH $TEST_FILE_CONTENT_HASH")
+	
+	result=$(lockServer verify-changes "${changedFiles[@]}")
+	assertEquals "Server should fail delete verification if deletion wasn't based on the latest version: $result" 1 $?
+	checkExpectedMsg "'$TEST_FILE' is not the latest version" "$result"
+	checkExpectedMsg "from user $TEST_USER_NAME" "$result"
+	checkExpectedMsg "at" "$result"
+}
+
+testServerVerifyChangesShouldPassIfFileWasAdded() {
+	testServerShouldBeAbleToCreateNewReleaseFolder
+	
+	# Change the file
+	echo "asdf" > "$TEST_FILE"
+	assertEquals "Add of the test file should run successfully: $returnValue" 0 $?
+	
+	# Lock and unlock the file
+	result=$(lockServer lock "$TEST_USER_NAME" "$TEST_PROJECT_NAME" "$TEST_RELEASE_NAME" "$TEST_FILE" "$TEST_FILE_CONTENT_HASH")
+	assertEquals "lockServer lock should run successfully: $result" 0 $?
+	result=$(lockServer unlock "$TEST_USER_NAME" "$TEST_PROJECT_NAME" "$TEST_RELEASE_NAME" "$TEST_FILE" "$TEST_SECOND_FILE_CONTENT_HASH")
+	assertEquals "lockServer unlock should run successfully: $result" 0 $?
+	
+	# Pretend addition of a unlocked file	
+	changedFiles=()
+	changedFiles+=("master A $TEST_FILENAME_HASH $TEST_SECOND_FILE_CONTENT_HASH")
+	
+	result=$(lockServer verify-changes "${changedFiles[@]}")
+	assertEquals "Server should pass change of deleted file: $result" 0 $?
+}
+
+testServerVerifyChangesShouldFailIfAddedFileWasNotBasedOnTheLatestVersion() {
+	testServerShouldBeAbleToCreateNewReleaseFolder
+	
+	# Change the file
+	echo "asdf" > "$TEST_FILE"
+	assertEquals "Change of the test file should run successfully: $returnValue" 0 $?
+	
+	# Lock and unlock the file
+	result=$(lockServer lock "$TEST_USER_NAME" "$TEST_PROJECT_NAME" "$TEST_RELEASE_NAME" "$TEST_FILE" "$TEST_FILE_CONTENT_HASH")
+	assertEquals "lockServer lock should run successfully: $result" 0 $?
+	result=$(lockServer unlock "$TEST_USER_NAME" "$TEST_PROJECT_NAME" "$TEST_RELEASE_NAME" "$TEST_FILE" "$TEST_SECOND_FILE_CONTENT_HASH")
+	assertEquals "lockServer unlock should run successfully: $result" 0 $?
+	
+	# Pretend a addition of an unlocked file and send an old content hash
+	changedFiles=()
+	changedFiles+=("master A $TEST_FILENAME_HASH $TEST_FILE_CONTENT_HASH")
+	
+	result=$(lockServer verify-changes "${changedFiles[@]}")
+	assertEquals "Server should fail addition verification if addition wasn't based on the latest version: $result" 1 $?
+	checkExpectedMsg "'$TEST_FILE' is not the latest version" "$result"
+	checkExpectedMsg "from user $TEST_USER_NAME" "$result"
+	checkExpectedMsg "at" "$result"
+}
+
 
 # run the tests with shunit2
 . ./shunit2

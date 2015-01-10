@@ -490,7 +490,7 @@ lockServerVerifyChange() {
 		user=$(sed -n "1p" "$lockFilePath" | cut -d ":" -f2)
 		file=$(sed -n "2p" "$lockFilePath" | cut -d ":" -f2)
 		timestamp=$(sed -n "3p" "$lockFilePath" | cut -d ":" -f2)
-		expectSuccess "$change file $file is locked by $user since $timestamp. Please unlock first and push again." 1
+		expectSuccess "$change file '$file' is locked by $user since $timestamp. Please unlock first and push again." 1
 	else
 		logDebug "File is not locked"
 	fi
@@ -508,7 +508,7 @@ lockServerVerifyChange() {
 				user=$(sed -n "1p" "$latestInfoFilePath" | cut -d ":" -f2)
 				file=$(sed -n "2p" "$latestInfoFilePath" | cut -d ":" -f2)
 				timestamp=$(sed -n "3p" "$latestInfoFilePath" | cut -d ":" -f2-5)
-				expectSuccess "$change file $file is not the latest version stored on the lock server. It looks like you changed the file without locking it first. Remove your change, get the latest version and then lock the file before doing your change. Last changed received from user $user at $timestamp" 1
+				expectSuccess "$change file content for '$file' is not the latest version stored on the lock server. It looks like you changed the file without locking it first. Remove your change, get the latest version and then lock the file before doing your change. Last changed received from user $user at $timestamp. Expected content hash $latestHash but received $contentHash. Patch lock info file on server if you can't resolve the change: $latestFilePath" 1
 			else
 				expectSuccess "Didn't receive the latest content hash for file $fileNameHash and couldn't find latest info file to give a meaningful error message. Missing file: $latestInfoFilePath" 1
 			fi
