@@ -25,6 +25,15 @@ Git-lock consists of three components.
 ## SHOW ALL AVAILABLE COMMANDS
 > $ git-lock --help
 
+## INIT GIT BARE REPOSITORY
+
+When receiving a push to a bare repository git-lock needs to verify that all changes are valid e.g. that no locked file was pushed.
+Therefore a git hook needs to be installed in all bare repositories which need to be checked before accepting a push.
+As the hook needs to communication with the lock server it needs to be initialized to get and store the server details:
+
+> $ cd $BARE_REPO_PATH
+> $ git-lock init --bare
+
 ## SAMPLE INIT & LOCK FILE
 
 * Clone an existing git repo
