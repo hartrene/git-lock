@@ -32,6 +32,7 @@ Therefore a git hook needs to be installed in all bare repositories which need t
 As the hook needs to communication with the lock server it needs to be initialized to get and store the server details:
 
 > $ cd $BARE_REPO_PATH
+
 > $ git-lock init --bare
 
 ## SAMPLE INIT & LOCK FILE
