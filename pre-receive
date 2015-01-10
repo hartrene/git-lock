@@ -11,7 +11,7 @@ LOG_LEVEL_QUIET=0
 LOG_LEVEL_ERROR=1
 LOG_LEVEL_INFO=2
 LOG_LEVEL_DEBUG=3
-logLevel=$LOG_LEVEL_DEBUG
+logLevel=$LOG_LEVEL_ERROR
 
 # Logs a debug message, if the log level allows
 logDebug() {
@@ -79,9 +79,12 @@ while read oldrev newrev refname; do
 		else
 			contentHash="$newContentHash"
 		fi
+		logDebug "Found change and send to verify to the lock server: $branch $changeFlag $filenameHash $contentHash"
 		changedFiles+=("$branch" "$changeFlag" "$filenameHash" "$contentHash")
 	done
 	
-	returnValue=$(executeOnServer verify-changes "${changedFiles[@]}")
-	expectSuccess "Server wasn't able to verify the changes: $returnValue" $?
+	if [ "$changedFiles" != "" ]; then
+		returnValue=$(executeOnServer verify-changes "${changedFiles[@]}")
+		expectSuccess "Server wasn't able to verify the changes: $returnValue" $?
+	fi
 done

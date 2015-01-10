@@ -166,21 +166,8 @@ discoverRelativeFilepathFromGitRoot() {
 	checkParameter 1 "discoverRelativeFilepathFromGitRoot() [FILE]" "$@"
 	local file="$1";
 	
-	# Get the directory of the file starting from git-root
-	discoverGitRoot gitRoot
-		
-	# Build the relative filepath
-	local currentDirectory="$(pwd)"
-	local gitSubDirectory="${currentDirectory/${gitRoot}\//}"
-	if [ "$gitSubDirectory" == "$currentDirectory" ]; then
-		local gitSubDirectory="${currentDirectory/${gitRoot}/}"
-	fi
-	if [ "$gitSubDirectory" = "" ]; then
-		local relativeFilepath="$file"
-	else
-		local relativeFilepath="$gitSubDirectory/$file"
-	fi
-	echo "$relativeFilepath"
+	subdir=$(git rev-parse --show-prefix)
+	echo "${subdir}${file}"
 }
 
 # Discovers the root directory of this git repository

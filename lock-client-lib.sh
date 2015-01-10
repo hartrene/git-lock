@@ -107,9 +107,7 @@ lockClient() {
 		lookup-project-dir) lockClientLookupServer "project-dir" "$@";;
 		lookup-release-dir) lockClientLookupServer "release-dir" "$@";;
 		
-		*)
-			echo "git-lock unknown command: $command"
-			exit 1;;
+		*) lockClientHelp "$@";;
 	esac
 }
 
@@ -310,7 +308,7 @@ lockClientLock() {
 		
 	# Get the git user name
 	user=$(git config user.name)
-	expectSuccess "Could not find the git username? $user" $?
+	expectSuccess "Could not find the git username? Set one up first with: git config --global user.name 'John Doe'" $?
 	
 	# Build the file path of the given file including the subdirectory starting from git root
 	relativeFilepath=$(discoverRelativeFilepathFromGitRoot "$fileToLock")

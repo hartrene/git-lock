@@ -9,7 +9,6 @@ client:
 	cp git-lock target/client/bin
 	cp lock-client-lib.sh target/client/bin
 	cp lock-util.sh target/client/bin
-	mkdir target/client/hooks
 	cp pre-receive target/client/bin
 	tar -cf target/client.tar -C target/client .
 	

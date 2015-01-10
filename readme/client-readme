@@ -3,3 +3,7 @@ These files have to be distributed to all git clients which like to participate.
 
 bin: 
 	All files in bin need to be on the PATH on each client.
+	> $ export PATH=/opt/git-lock-client/bin/$PATH
+	
+	Additionally the environment variable LOCK_CLIENT_BIN_DIR need to be set to the bin directory.
+	> $ export LOCK_CLIENT_BIN_DIR=/opt/git-lock-client/bin
