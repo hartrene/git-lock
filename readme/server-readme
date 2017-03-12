@@ -23,7 +23,7 @@ lock-working-dir: (LOCK_SERVER_DIR)
 	This directory is expected to be empty in the beginning.
 	
 	This directory needs to be published by the environment variable LOCK_SERVER_DIR.
-	All ssh user who are going use the lock-server need to set-up this variable.
+	All ssh users who are going use the lock-server need to set-up this variable.
 	
 		> export LOCK_SERVER_DIR=/lock-server/working-dir
 		
