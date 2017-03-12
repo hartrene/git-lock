@@ -15,8 +15,17 @@ RUN apt-get install -y vim openssh-server
 RUN mkdir /var/run/sshd
 RUN echo "PermitUserEnvironment yes" >> /etc/ssh/sshd_config
 
+# add gitlock binaries
+ADD target/server.tar /gitlock-server
+RUN chown -R root:root /gitlock-server
+RUN chmod +x /gitlock-server/bin
+RUN rm -rf /gitlock-server/lock-working-dir
+
 # setup the gitlock user
-RUN addgroup gitlock && useradd -g gitlock -m gitlock
+RUN addgroup gitlock
+RUN useradd -g gitlock -m gitlock
+
+# setup .ssh/authorized_keys file for gitlock
 RUN cd /home/gitlock && \
 	mkdir .ssh && \
 	chmod 700 .ssh && \
@@ -24,14 +33,9 @@ RUN cd /home/gitlock && \
 	chmod 600 .ssh/authorized_keys && \
 	chown -R gitlock:gitlock .ssh
 
-# add gitlock binaries
-ADD target/server.tar /home/gitlock
-RUN chown -R gitlock:gitlock /home/gitlock/bin
-RUN chmod -R u+x /home/gitlock/bin/*
-
 # setup the gitlock environment variables when user ssh into the host
-RUN echo "LOCK_SERVER_BIN_DIR=/home/gitlock/bin" > /home/gitlock/.ssh/environment
-RUN echo "LOCK_SERVER_DIR=/home/gitlock/lock-working-dir" >> /home/gitlock/.ssh/environment
+RUN echo "LOCK_SERVER_BIN_DIR=/gitlock-server/bin" > /home/gitlock/.ssh/environment
+RUN echo "LOCK_SERVER_DIR=/home/gitlock" >> /home/gitlock/.ssh/environment
 
 EXPOSE 22
 CMD ["/usr/sbin/sshd","-D"]
