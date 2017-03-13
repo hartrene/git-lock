@@ -33,9 +33,14 @@ RUN cd /home/gitlock && \
 	chmod 600 .ssh/authorized_keys && \
 	chown -R gitlock:gitlock .ssh
 
+# create a /data volume where we store the git-lock working data
+RUN mkdir /data
+RUN chown gitlock:gitlock /data
+VOLUME /data
+
 # setup the gitlock environment variables when user ssh into the host
 RUN echo "LOCK_SERVER_BIN_DIR=/gitlock-server/bin" > /home/gitlock/.ssh/environment
-RUN echo "LOCK_SERVER_DIR=/home/gitlock" >> /home/gitlock/.ssh/environment
+RUN echo "LOCK_SERVER_DIR=/data" >> /home/gitlock/.ssh/environment
 
 EXPOSE 22
 CMD ["/usr/sbin/sshd","-D"]
